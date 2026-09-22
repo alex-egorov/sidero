@@ -1,3 +1,398 @@
+## [Sidero 0.6.15](https://github.com/siderolabs/sidero/releases/tag/v0.6.15) (2026-09-22)
+
+Welcome to the v0.6.15 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/siderolabs/sidero/issues.
+
+### Talos
+
+Sidero Metal is now compatible with Talos v1.14.x.
+
+
+### Contributors
+
+* Andrey Smirnov
+* Utku Ozdemir
+* Dmitrii Sharshakov
+* Dmitriy Matrenichev
+* Mark Glants
+* Noel Georgi
+
+### Changes
+<details><summary>1 commit</summary>
+<p>
+
+* [`6ab0c39`](https://github.com/siderolabs/sidero/commit/6ab0c39d9dceb1bdd3cd0432acf19e3a59020981) feat: update for Talos 1.14 compatibility
+</p>
+</details>
+
+### Changes from siderolabs/gen
+<details><summary>3 commits</summary>
+<p>
+
+* [`cbd9518`](https://github.com/siderolabs/gen/commit/cbd9518a7bc6d70cf85390c1f6109c8236ba2a49) chore: rekres and update deps
+* [`26ccee1`](https://github.com/siderolabs/gen/commit/26ccee180839c57d9e2e4fcdf37e4753fc0feb25) feat: provide new YAMl unmarshal validator for null values
+* [`c526410`](https://github.com/siderolabs/gen/commit/c526410f8c26b75ab386877036d4855098f9c429) fix: skip unknown-key check for types with custom YAML unmarshaler
+</p>
+</details>
+
+### Changes from siderolabs/go-debug
+<details><summary>1 commit</summary>
+<p>
+
+* [`44d6398`](https://github.com/siderolabs/go-debug/commit/44d639874ed86ee9ef005e700143d3a5b60bc518) feat: support Go 1.27
+</p>
+</details>
+
+### Changes from siderolabs/go-kmsg
+<details><summary>1 commit</summary>
+<p>
+
+* [`65e97cb`](https://github.com/siderolabs/go-kmsg/commit/65e97cb418de5211ac2bfdc9d4569af74fbbb9f8) fix: boot time offset calculation
+</p>
+</details>
+
+### Changes from siderolabs/go-smbios
+<details><summary>1 commit</summary>
+<p>
+
+* [`063f5dc`](https://github.com/siderolabs/go-smbios/commit/063f5dc16e0a86d4dbb8290d197bdb134d9bafac) chore: rekres + new testdata
+</p>
+</details>
+
+### Changes from siderolabs/grpc-proxy
+<details><summary>3 commits</summary>
+<p>
+
+* [`d670c42`](https://github.com/siderolabs/grpc-proxy/commit/d670c420307acbdc1c71cc1572c1d826f07cf406) chore: bump dependencies
+* [`8614c71`](https://github.com/siderolabs/grpc-proxy/commit/8614c7158032488d36285ce2245d06f49d7447c4) chore: bump deps
+* [`80677e0`](https://github.com/siderolabs/grpc-proxy/commit/80677e04c18d908cacb69566ed95c78c400d4d99) fix: propagate the headers before the message
+</p>
+</details>
+
+### Changes from siderolabs/siderolink
+<details><summary>7 commits</summary>
+<p>
+
+* [`755a982`](https://github.com/siderolabs/siderolink/commit/755a9828fba165ca40b12df0ecd194bec2a9f7b6) chore: update dependencies and rekres
+* [`5d6e09f`](https://github.com/siderolabs/siderolink/commit/5d6e09f62bdb1d2fc49e8f06efe0e008bb0e84c5) fix: rework keying of the streams to the peers
+* [`ad296ab`](https://github.com/siderolabs/siderolink/commit/ad296ab6d9dc41c01a0a72563ec483054cc2d398) chore: rekres, bump deps
+* [`23030b0`](https://github.com/siderolabs/siderolink/commit/23030b03cc25fc04a38b096fbbce60a5bb66f081) fix: keep a replacement gRPC stream's send queue after cleanup
+* [`4b69f46`](https://github.com/siderolabs/siderolink/commit/4b69f46903ba628818a2bb9bfd161bf4b1f57808) fix: correct the wireguard device error handling
+* [`5157d0c`](https://github.com/siderolabs/siderolink/commit/5157d0c6baa873ee4bb4d5a5df5f46314433c9de) fix: accept valid short IPv6 packets on filtered devices
+* [`0a1933c`](https://github.com/siderolabs/siderolink/commit/0a1933ce37ee5383dc0c875fa9da318f38c76e31) chore: bump dependencies
+</p>
+</details>
+
+### Dependency Changes
+
+* **github.com/go-logr/logr**                    v1.4.3 -> v1.4.4
+* **github.com/insomniacslk/dhcp**               5f8cf70e8c5f -> 234b97448fae
+* **github.com/siderolabs/gen**                  v0.8.6 -> v0.8.8
+* **github.com/siderolabs/go-debug**             v0.6.2 -> v0.6.3
+* **github.com/siderolabs/go-kmsg**              v0.1.5 -> v0.1.6
+* **github.com/siderolabs/go-smbios**            v0.3.3 -> v0.3.4
+* **github.com/siderolabs/grpc-proxy**           v0.5.1 -> v0.5.2
+* **github.com/siderolabs/siderolink**           v0.3.15 -> v0.3.18
+* **github.com/siderolabs/talos/pkg/machinery**  v1.13.0 -> v1.14.1
+* **github.com/stretchr/testify**                v1.11.1 -> v1.12.1
+* **go.uber.org/zap**                            v1.27.1 -> v1.28.0
+* **golang.org/x/sync**                          v0.20.0 -> v0.23.0
+* **golang.org/x/sys**                           v0.43.0 -> v0.48.0
+* **google.golang.org/grpc**                     v1.80.0 -> v1.83.2
+* **google.golang.org/protobuf**                 f2248ac996af -> v1.36.12
+
+Previous release can be found at [v0.6.14](https://github.com/siderolabs/sidero/releases/tag/v0.6.14)
+
+## [Sidero 0.6.14](https://github.com/siderolabs/sidero/releases/tag/v0.6.14) (2026-06-12)
+
+Welcome to the v0.6.14 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/siderolabs/sidero/issues.
+
+### IPMI
+
+Sidero Metal now supports passing custom args to `ipmitool` invocation via Server.BMC.ExtraArgs field.
+
+
+### Contributors
+
+* Andrey Smirnov
+
+### Changes
+<details><summary>2 commits</summary>
+<p>
+
+* [`f7b030d`](https://github.com/siderolabs/sidero/commit/f7b030db323a2ea21f072ee31556cdcc4af96517) release(v0.6.14): prepare release
+* [`dc44d39`](https://github.com/siderolabs/sidero/commit/dc44d396227a2855393c0719bee7f93e6d9f7dcd) feat: add support for custom ipmitool invocation args
+</p>
+</details>
+
+### Dependency Changes
+
+This release has no dependency changes
+
+Previous release can be found at [v0.6.13](https://github.com/siderolabs/sidero/releases/tag/v0.6.13)
+
+## [Sidero 0.6.13](https://github.com/talos-systems/sidero/releases/tag/v0.6.13) (2026-04-28)
+
+Welcome to the v0.6.13 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Talos Linux
+
+Sidero Metal now supports Talos Linux v1.13.x.
+
+
+### Contributors
+
+* Andrey Smirnov
+* Spencer Smith
+
+### Changes
+<details><summary>3 commits</summary>
+<p>
+
+* [`9403167`](https://github.com/talos-systems/sidero/commit/9403167eaba0c2dbcd4091832d428d1cca61593b) feat: update Talos to 1.13.0
+* [`25b235a`](https://github.com/talos-systems/sidero/commit/25b235aa4d97d291b1f8bdd763f28b2f1f35ea23) feat: update Talos to v1.13.0-rc.0
+* [`7157ea7`](https://github.com/talos-systems/sidero/commit/7157ea74abf3ac961b60ee1f0de32050182c8018) chore: bump dependencies crypto and containernetworking plugins
+</p>
+</details>
+
+### Dependency Changes
+
+* **github.com/siderolabs/go-debug**             v0.6.1 -> v0.6.2
+* **github.com/siderolabs/go-kmsg**              v0.1.4 -> v0.1.5
+* **github.com/siderolabs/talos/pkg/machinery**  v1.12.0 -> v1.13.0
+* **github.com/spf13/pflag**                     v1.0.7 -> v1.0.10
+* **go.uber.org/zap**                            v1.27.0 -> v1.27.1
+* **golang.org/x/net**                           v0.47.0 -> v0.53.0
+* **golang.org/x/sync**                          v0.18.0 -> v0.20.0
+* **golang.org/x/sys**                           v0.38.0 -> v0.43.0
+* **google.golang.org/grpc**                     v1.76.0 -> v1.80.0
+* **google.golang.org/protobuf**                 v1.36.10 -> f2248ac996af
+
+Previous release can be found at [v0.6.12](https://github.com/talos-systems/sidero/releases/tag/v0.6.12)
+
+## [Sidero 0.6.12](https://github.com/talos-systems/sidero/releases/tag/v0.6.12) (2025-12-24)
+
+Welcome to the v0.6.12 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Talos Linux
+
+Sidero Metal now supports Talos Linux v1.12.x.
+
+
+### Contributors
+
+* Laura Brehm
+* Andrey Smirnov
+
+### Changes
+<details><summary>9 commits</summary>
+<p>
+
+* [`bf6c2e7`](https://github.com/talos-systems/sidero/commit/bf6c2e7db2fd6ec6187aee2dda3f89de18f58697) feat: update to Talos 1.12.0
+* [`3f1c8dc`](https://github.com/talos-systems/sidero/commit/3f1c8dc81e049675d375aeb7f3c254601c1b4d2e) feat: bump talos to v1.12.0-beta.0
+* [`13de044`](https://github.com/talos-systems/sidero/commit/13de0445c410255fd5ac3392eb4b7eb201b0d256) chore: address `staticcheck` api naming var things
+* [`280a513`](https://github.com/talos-systems/sidero/commit/280a51389a143e9b39e88f33a8fb2e0bfd3e79f3) chore: address `gofumpt` linter issues
+* [`7bcc16b`](https://github.com/talos-systems/sidero/commit/7bcc16b050765dd171e109b9d8a5dee43a66537b) chore: address wsl_v5 linter checks
+* [`ccaba74`](https://github.com/talos-systems/sidero/commit/ccaba7425d3b9c485f1b58489e0e17e7029fd491) chore: migrate .golangci.yml to v2
+* [`caea4b3`](https://github.com/talos-systems/sidero/commit/caea4b3ad1723ece38fde2391ee6188a71fb315f) chore: rekres with latest changes
+* [`0826793`](https://github.com/talos-systems/sidero/commit/08267933be79f8024f3382e505302dcc4b085af9) chore: use typed config resources in metadata server
+* [`d0fbc6f`](https://github.com/talos-systems/sidero/commit/d0fbc6f7d90588adc7a3a5f86d1110ad815637e6) feat: inject SideroLink config documents into machine config for UKI
+</p>
+</details>
+
+### Dependency Changes
+
+* **github.com/siderolabs/gen**                  v0.8.5 -> v0.8.6
+* **github.com/siderolabs/go-debug**             v0.5.0 -> v0.6.1
+* **github.com/siderolabs/talos/pkg/machinery**  v1.11.0 -> v1.12.0
+* **github.com/stretchr/testify**                v1.10.0 -> v1.11.1
+* **golang.org/x/net**                           v0.43.0 -> v0.47.0
+* **golang.org/x/sync**                          v0.16.0 -> v0.18.0
+* **golang.org/x/sys**                           v0.35.0 -> v0.38.0
+* **google.golang.org/grpc**                     v1.74.2 -> v1.76.0
+* **google.golang.org/protobuf**                 v1.36.7 -> v1.36.10
+* **sigs.k8s.io/cluster-api**                    v1.10.4 -> v1.10.9
+
+Previous release can be found at [v0.6.11](https://github.com/talos-systems/sidero/releases/tag/v0.6.11)
+
+## [Sidero 0.6.11](https://github.com/talos-systems/sidero/releases/tag/v0.6.11) (2025-09-02)
+
+Welcome to the v0.6.11 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Talos Linux
+
+Sidero Metal now supports Talos Linux v1.11.x.
+
+
+### Contributors
+
+* Andrey Smirnov
+
+### Changes
+<details><summary>2 commits</summary>
+<p>
+
+* [`55df6d4`](https://github.com/talos-systems/sidero/commit/55df6d441b977d2198f4a0080e3ccc0a517b4e7e) feat: update Talos to v1.11.0
+* [`0939b37`](https://github.com/talos-systems/sidero/commit/0939b37b42fea33eb1d6f235f0107d6f71839d7e) feat: update to Talos v1.11.0-beta.2
+</p>
+</details>
+
+### Dependency Changes
+
+* **github.com/go-logr/logr**                    v1.4.2 -> v1.4.3
+* **github.com/siderolabs/gen**                  v0.8.0 -> v0.8.5
+* **github.com/siderolabs/siderolink**           v0.3.14 -> v0.3.15
+* **github.com/siderolabs/talos/pkg/machinery**  v1.10.0 -> v1.11.0
+* **github.com/spf13/pflag**                     v1.0.6 -> v1.0.7
+* **golang.org/x/net**                           v0.39.0 -> v0.43.0
+* **golang.org/x/sync**                          v0.13.0 -> v0.16.0
+* **golang.org/x/sys**                           v0.32.0 -> v0.35.0
+* **google.golang.org/grpc**                     v1.72.0 -> v1.74.2
+* **google.golang.org/protobuf**                 v1.36.6 -> v1.36.7
+* **sigs.k8s.io/cluster-api**                    v1.10.1 -> v1.10.4
+
+Previous release can be found at [v0.6.10](https://github.com/talos-systems/sidero/releases/tag/v0.6.10)
+
+## [Sidero 0.6.10](https://github.com/talos-systems/sidero/releases/tag/v0.6.10) (2025-06-11)
+
+Welcome to the v0.6.10 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Contributors
+
+* Andrey Smirnov
+
+### Changes
+<details><summary>1 commit</summary>
+<p>
+
+* [`0dcfd1b`](https://github.com/talos-systems/sidero/commit/0dcfd1b57a35d46bf0f172bb126424114536f4ec) fix: multi doc machine config generation
+</p>
+</details>
+
+### Dependency Changes
+
+This release has no dependency changes
+
+Previous release can be found at [v0.6.9](https://github.com/talos-systems/sidero/releases/tag/v0.6.9)
+
+## [Sidero 0.6.9](https://github.com/talos-systems/sidero/releases/tag/v0.6.9) (2025-05-02)
+
+Welcome to the v0.6.9 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Contributors
+
+* Noel Georgi
+
+### Changes
+<details><summary>1 commit</summary>
+<p>
+
+* [`4e082be`](https://github.com/talos-systems/sidero/commit/4e082be6d1277372479d0820ae24ad7ba978c519) fix(ci): arm64 container image asset
+</p>
+</details>
+
+### Dependency Changes
+
+This release has no dependency changes
+
+Previous release can be found at [v0.6.8](https://github.com/talos-systems/sidero/releases/tag/v0.6.8)
+
+## [Sidero 0.6.8](https://github.com/talos-systems/sidero/releases/tag/v0.6.8) (2025-05-01)
+
+Welcome to the v0.6.8 release of Sidero!
+
+
+
+Please try out the release binaries and report any issues at
+https://github.com/talos-systems/sidero/issues.
+
+### Cluster API
+
+Sidero Metal is now built and tested with Cluster API 1.10.0.
+
+
+### Talos Linux
+
+Sidero Metal now supports Talos Linux v1.10.x.
+
+
+### Contributors
+
+* Andrey Smirnov
+* Noel Georgi
+* Utku Ozdemir
+
+### Changes
+<details><summary>4 commits</summary>
+<p>
+
+* [`520bb35`](https://github.com/talos-systems/sidero/commit/520bb357a07b07b1aff1f29c2aa5281cd903fcb6) feat: update to Talos 1.10.0 final
+* [`3784341`](https://github.com/talos-systems/sidero/commit/37843417f965ce88c0873e530976e8e2e3bab662) feat: update Talos and CAPI to 1.10
+* [`b27fca4`](https://github.com/talos-systems/sidero/commit/b27fca4f564d25ba831f5036e1c27f5aa4573004) feat: use kres to manage github actions
+* [`a46f257`](https://github.com/talos-systems/sidero/commit/a46f2576f9b73b5304bc586b94c3dcc6ce0d6f74) docs: add Omni bare metal infra provider link to maintenance warning
+</p>
+</details>
+
+### Dependency Changes
+
+* **github.com/google/go-cmp**                   v0.6.0 -> v0.7.0
+* **github.com/insomniacslk/dhcp**               a481575ed0ef -> 5f8cf70e8c5f
+* **github.com/siderolabs/gen**                  v0.7.0 -> v0.8.0
+* **github.com/siderolabs/go-debug**             v0.4.0 -> v0.5.0
+* **github.com/siderolabs/go-pointer**           v1.0.0 -> v1.0.1
+* **github.com/siderolabs/siderolink**           v0.3.11 -> v0.3.14
+* **github.com/siderolabs/talos/pkg/machinery**  v1.9.0 -> v1.10.0
+* **github.com/spf13/pflag**                     v1.0.5 -> v1.0.6
+* **golang.org/x/net**                           v0.32.0 -> v0.39.0
+* **golang.org/x/sync**                          v0.10.0 -> v0.13.0
+* **golang.org/x/sys**                           v0.28.0 -> v0.32.0
+* **golang.zx2c4.com/wireguard/wgctrl**          925a1e7659e6 -> a9ab2273dd10
+* **google.golang.org/grpc**                     v1.68.1 -> v1.72.0
+* **google.golang.org/protobuf**                 v1.35.2 -> v1.36.6
+* **k8s.io/api**                                 v0.31.3 -> v0.32.3
+* **k8s.io/apiextensions-apiserver**             v0.31.3 -> v0.32.3
+* **k8s.io/apimachinery**                        v0.31.3 -> v0.32.3
+* **k8s.io/client-go**                           v0.31.3 -> v0.32.3
+* **k8s.io/component-base**                      v0.31.3 -> v0.32.3
+* **sigs.k8s.io/cluster-api**                    v1.9.1 -> v1.10.1
+* **sigs.k8s.io/controller-runtime**             v0.19.3 -> v0.20.4
+
+Previous release can be found at [v0.6.7](https://github.com/talos-systems/sidero/releases/tag/v0.6.7)
+
 ## [Sidero 0.6.7](https://github.com/talos-systems/sidero/releases/tag/v0.6.7) (2024-12-20)
 
 Welcome to the v0.6.7 release of Sidero!

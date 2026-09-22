@@ -15,14 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/siderolabs/go-pointer"
 	"github.com/siderolabs/go-retry/retry"
-	talosconfig "github.com/siderolabs/talos/pkg/machinery/config/types/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -156,39 +153,33 @@ func TestServerPatch(ctx context.Context, metalClient client.Client, registryMir
 
 		require.NoError(t, metalClient.List(ctx, servers))
 
-		installConfig := talosconfig.InstallConfig{
-			InstallDisk:       "/dev/vda",
-			InstallBootloader: pointer.To(true),
-			InstallExtraKernelArgs: []string{
-				"console=ttyS0",
-				"reboot=k",
-				"panic=1",
-				"talos.shutdown=halt",
+		configPatch := map[string]any{
+			"machine": map[string]any{
+				"install": map[string]any{
+					"disk": "/dev/vda",
+				},
 			},
 		}
-		installPatch := configPatchToJSON(t, &installConfig)
-
-		var mirrorsPatch []byte
 
 		if len(registryMirrors) > 0 {
-			var registriesConfig talosconfig.RegistriesConfig
-
-			registriesConfig.RegistryMirrors = make(map[string]*talosconfig.RegistryMirrorConfig)
+			mirrors := map[string]any{}
 
 			for _, mirror := range registryMirrors {
 				parts := strings.SplitN(mirror, "=", 2)
 				require.Len(t, parts, 2)
 
-				registriesConfig.RegistryMirrors[parts[0]] = &talosconfig.RegistryMirrorConfig{
-					MirrorEndpoints: []string{parts[1]},
+				mirrors[parts[0]] = map[string]any{
+					"endpoints": []string{parts[1]},
 				}
 			}
 
-			mirrorsPatch = configPatchToJSON(t, &registriesConfig)
+			configPatch["machine"].(map[string]any)["registries"] = map[string]any{
+				"mirrors": mirrors,
+			}
 		}
 
 		for _, server := range servers.Items {
-			if len(server.Spec.ConfigPatches) > 0 {
+			if len(server.Spec.ConfigPatches) > 0 || len(server.Spec.StrategicPatches) > 0 {
 				continue
 			}
 
@@ -197,19 +188,7 @@ func TestServerPatch(ctx context.Context, metalClient client.Client, registryMir
 			patchHelper, err := patch.NewHelper(&server, metalClient)
 			require.NoError(t, err)
 
-			server.Spec.ConfigPatches = append(server.Spec.ConfigPatches, metalv1.ConfigPatches{
-				Op:    "replace",
-				Path:  "/machine/install",
-				Value: apiextensions.JSON{Raw: installPatch},
-			})
-
-			if mirrorsPatch != nil {
-				server.Spec.ConfigPatches = append(server.Spec.ConfigPatches, metalv1.ConfigPatches{
-					Op:    "add",
-					Path:  "/machine/registries",
-					Value: apiextensions.JSON{Raw: mirrorsPatch},
-				})
-			}
+			server.Spec.StrategicPatches = append(server.Spec.StrategicPatches, string(configPatchToJSON(t, configPatch)))
 
 			require.NoError(t, patchHelper.Patch(ctx, &server))
 		}
@@ -553,15 +532,11 @@ func TestServerPXEBoot(ctx context.Context, metalClient client.Client, cluster t
 					},
 				},
 			},
-			EnvironmentRef: &v1.ObjectReference{
+			EnvironmentRef: &corev1.ObjectReference{
 				Name: environmentName,
 			},
-			ConfigPatches: []metalv1.ConfigPatches{
-				{
-					Op:    "add",
-					Path:  "/fake",
-					Value: apiextensions.JSON{Raw: []byte("\":|\"")},
-				},
+			StrategicPatches: []string{
+				`{"machine": {"nodeLabels": {"/1": "2"}}}`,
 			},
 		}
 
@@ -609,7 +584,7 @@ func TestServerPXEBoot(ctx context.Context, metalClient client.Client, cluster t
 		patchHelper, err := patch.NewHelper(&serverClass, metalClient)
 		require.NoError(t, err)
 
-		serverClass.Spec.ConfigPatches = nil
+		serverClass.Spec.StrategicPatches = nil
 
 		err = patchHelper.Patch(ctx, &serverClass)
 		require.NoError(t, err)

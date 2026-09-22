@@ -27,6 +27,7 @@ import (
 
 	"github.com/siderolabs/go-procfs/procfs"
 	talosconstants "github.com/siderolabs/talos/pkg/machinery/constants"
+	"github.com/siderolabs/talos/pkg/machinery/imager/quirks"
 	"github.com/siderolabs/talos/pkg/machinery/kernel"
 
 	infrav1 "github.com/siderolabs/sidero/app/caps-controller-manager/api/v1alpha3"
@@ -400,7 +401,7 @@ func newEnvironment(ctx context.Context, server *metalv1.Server, serverBinding *
 }
 
 func newAgentEnvironment(arch, mac string) *metalv1.Environment {
-	args := append([]string(nil), kernel.DefaultArgs...)
+	args := append([]string(nil), kernel.DefaultArgs(quirks.New(""))...)
 	args = append(args,
 		"console=tty0",
 		"console=ttyS0",
@@ -504,22 +505,22 @@ outer:
 		case talosConfigPrefix:
 			// patch environment with the link to the metadata server
 			env.Spec.Kernel.Args = append(env.Spec.Kernel.Args,
-				fmt.Sprintf("%s=http://%s:%d/configdata?uuid=", talosconstants.KernelParamConfig, apiEndpoint, apiPort),
+				fmt.Sprintf("%s=http://%s/configdata?uuid=", talosconstants.KernelParamConfig, net.JoinHostPort(apiEndpoint, strconv.Itoa(apiPort))),
 			)
 		case sideroLinkPrefix:
 			// patch environment with the SideroLink API
 			env.Spec.Kernel.Args = append(env.Spec.Kernel.Args,
-				fmt.Sprintf("%s=%s:%d", talosconstants.KernelParamSideroLink, apiEndpoint, apiPort),
+				fmt.Sprintf("%s=%s", talosconstants.KernelParamSideroLink, net.JoinHostPort(apiEndpoint, strconv.Itoa(apiPort))),
 			)
 		case logDeliveryPrefix:
 			// patch environment with the log receiver endpoint
 			env.Spec.Kernel.Args = append(env.Spec.Kernel.Args,
-				fmt.Sprintf("%s=tcp://[%s]:%d", talosconstants.KernelParamLoggingKernel, siderolink.Cfg.ServerAddress.Addr(), siderolink.LogReceiverPort),
+				fmt.Sprintf("%s=tcp://%s", talosconstants.KernelParamLoggingKernel, net.JoinHostPort(siderolink.Cfg.ServerAddress.Addr().String(), strconv.Itoa(siderolink.LogReceiverPort))),
 			)
 		case eventsSinkPrefix:
 			// patch environment with the events sink endpoint
 			env.Spec.Kernel.Args = append(env.Spec.Kernel.Args,
-				fmt.Sprintf("%s=[%s]:%d", talosconstants.KernelParamEventsSink, siderolink.Cfg.ServerAddress.Addr(), siderolink.EventsSinkPort),
+				fmt.Sprintf("%s=%s", talosconstants.KernelParamEventsSink, net.JoinHostPort(siderolink.Cfg.ServerAddress.Addr().String(), strconv.Itoa(siderolink.EventsSinkPort))),
 			)
 		}
 	}

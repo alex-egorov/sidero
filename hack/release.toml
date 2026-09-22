@@ -2,11 +2,11 @@
 commit = "HEAD"
 
 project_name = "Sidero"
-github_repo = "talos-systems/sidero"
-match_deps = "^github.com/(talos-systems/[a-zA-Z0-9-]+)$"
+github_repo = "siderolabs/sidero"
+match_deps = "^github.com/(siderolabs/[a-zA-Z0-9-]+)$"
 
 # previous release
-previous = "v0.6.6"
+previous = "v0.6.14"
 
 pre_release = false
 
@@ -16,13 +16,7 @@ preface = """\
 [notes]
 
 [notes.talos]
-    title = "Talos Linux"
-        description = """\
-Sidero Metal now supports Talos Linux v1.9.x.
-"""
-
-[notes.capi]
-    title = "Cluster API"
-        description = """\
-Sidero Metal is now built and tested with Cluster API 1.9.0.
+    title = "Talos"
+   description = """\
+Sidero Metal is now compatible with Talos v1.14.x.
 """

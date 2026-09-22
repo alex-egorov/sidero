@@ -28,6 +28,9 @@ func fixture() []client.Object {
 		fixture4,
 		fixture5,
 		fixture6,
+		fixture7,
+		fixture8,
+		fixture9,
 	} {
 		objects = append(objects, fixture()...)
 	}
@@ -206,7 +209,6 @@ func fixture4() []client.Object {
 	return fixtureSimple("4444-5555-6666", 4, `
 version: v1alpha1
 machine:
-  unsupported: {} # this is not supported by Talos, but should be passed through
 `)
 }
 
@@ -273,7 +275,15 @@ func fixture6() []client.Object {
 				Name: "6666-7777-8888",
 			},
 			Spec: metalv1.ServerSpec{
-				StrategicPatches: []string{newConfigPatch},
+				StrategicPatches: []string{
+					newConfigPatch,
+					`
+apiVersion: v1alpha1
+kind: ExtensionServiceConfig
+name: frr
+environment:
+- TESTKEY=TESTVALUE`,
+				},
 			},
 		},
 		&corev1.Secret{
@@ -291,6 +301,51 @@ machine:
 			},
 		},
 	}
+}
+
+// fixture7 creates a server with a Talos 1.14+ machine config: kubelet config lives in a
+// separate `KubeletConfig` document, and it has no `extraArgs`.
+func fixture7() []client.Object {
+	return fixtureSimple("7777-8888-9999", 7, `
+version: v1alpha1
+machine: {}
+---
+apiVersion: v1alpha1
+kind: KubeletConfig
+image: ghcr.io/siderolabs/kubelet:v1.34.0
+`)
+}
+
+// fixture8 creates a server with a Talos 1.14+ machine config with `node-labels` already set
+// in the `KubeletConfig` document as a string.
+func fixture8() []client.Object {
+	return fixtureSimple("8888-9999-0000", 8, `
+version: v1alpha1
+machine: {}
+---
+apiVersion: v1alpha1
+kind: KubeletConfig
+image: ghcr.io/siderolabs/kubelet:v1.34.0
+extraArgs:
+  node-labels: foo=bar
+  feature-gates: AllBeta=true
+`)
+}
+
+// fixture9 creates a server with a Talos 1.14+ machine config with `node-labels` already set
+// in the `KubeletConfig` document as a list.
+func fixture9() []client.Object {
+	return fixtureSimple("9999-0000-1111", 9, `
+version: v1alpha1
+machine: {}
+---
+apiVersion: v1alpha1
+kind: KubeletConfig
+image: ghcr.io/siderolabs/kubelet:v1.34.0
+extraArgs:
+  node-labels:
+    - foo=bar
+`)
 }
 
 func fixtureSimple(uuid string, index int, config string) []client.Object {

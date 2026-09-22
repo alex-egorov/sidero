@@ -5,13 +5,26 @@
 package metadata
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
+	"slices"
+	"strconv"
 
 	"github.com/siderolabs/talos/pkg/machinery/config/configpatcher"
+	"github.com/siderolabs/talos/pkg/machinery/config/container"
+	"github.com/siderolabs/talos/pkg/machinery/config/encoder"
+	k8stypes "github.com/siderolabs/talos/pkg/machinery/config/types/k8s"
+	"github.com/siderolabs/talos/pkg/machinery/config/types/meta"
+	runtimetypes "github.com/siderolabs/talos/pkg/machinery/config/types/runtime"
+	siderolinktypes "github.com/siderolabs/talos/pkg/machinery/config/types/siderolink"
 	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +34,7 @@ import (
 
 	infrav1 "github.com/siderolabs/sidero/app/caps-controller-manager/api/v1alpha3"
 	metalv1 "github.com/siderolabs/sidero/app/sidero-controller-manager/api/v1alpha2"
+	"github.com/siderolabs/sidero/app/sidero-controller-manager/internal/siderolink"
 )
 
 type errorWithCode struct {
@@ -29,7 +43,9 @@ type errorWithCode struct {
 }
 
 type metadataConfigs struct {
-	client runtimeclient.Client
+	client      runtimeclient.Client
+	apiEndpoint string
+	apiPort     int
 }
 
 func throwError(w http.ResponseWriter, ewc errorWithCode) {
@@ -37,9 +53,11 @@ func throwError(w http.ResponseWriter, ewc errorWithCode) {
 	log.Println(ewc.errorObj)
 }
 
-func RegisterServer(mux *http.ServeMux, k8sClient runtimeclient.Client) error {
+func RegisterServer(mux *http.ServeMux, k8sClient runtimeclient.Client, apiEndpoint string, apiPort int) error {
 	mm := metadataConfigs{
-		client: k8sClient,
+		client:      k8sClient,
+		apiEndpoint: apiEndpoint,
+		apiPort:     apiPort,
 	}
 
 	mux.HandleFunc("/configdata", mm.FetchConfig)
@@ -227,6 +245,18 @@ func (m *metadataConfigs) FetchConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Patch machine configuration with SideroLink config so it survives reboots
+	// TODO(laurazard): only do this if Talos v1.10+
+	decodedData, ewc = m.patchSideroLinkConfig(decodedData)
+	if ewc.errorObj != nil {
+		throwError(
+			w,
+			ewc,
+		)
+
+		return
+	}
+
 	// Finally return config data
 	if _, err = w.Write(decodedData); err != nil {
 		log.Printf("failed to write data: %v", err)
@@ -278,7 +308,7 @@ func patchConfig(decodedData []byte, patches []byte) ([]byte, errorWithCode) {
 
 	patched, err := configpatcher.Apply(configpatcher.WithBytes(decodedData), []configpatcher.Patch{patch})
 	if err != nil {
-		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure applying patches to machine config: %s", err)}
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure applying patches %s to machine config: %s", string(patches), err)}
 	}
 
 	result, err := patched.Bytes()
@@ -292,6 +322,102 @@ func patchConfig(decodedData []byte, patches []byte) ([]byte, errorWithCode) {
 // labelNodes is responsible for editing the kubelet extra args such that a given
 // server gets registered with a label containing the UUID of the server resource it's actually running on.
 func labelNodes(decodedData []byte, serverName string) ([]byte, errorWithCode) {
+	// Talos 1.14+ carries the kubelet configuration in a separate `KubeletConfig` document,
+	// while older versions keep it in `.machine.kubelet` of the `v1alpha1` document.
+	kubeletConfig, err := findKubeletConfigDocument(decodedData)
+	if err != nil {
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure parsing machine config documents: %s", err)}
+	}
+
+	if kubeletConfig != nil {
+		return labelNodesKubeletConfig(decodedData, serverName, kubeletConfig)
+	}
+
+	isMultiDoc := bytes.Contains(decodedData, []byte("---\n"))
+	if isMultiDoc {
+		return labelNodesStrategic(decodedData, serverName)
+	}
+
+	return labelNodesLegacy(decodedData, serverName)
+}
+
+// kubeletConfigDocument is a minimal representation of the Talos 1.14+ `KubeletConfig` document.
+//
+// As with the other config handling in this package, the `configloader` from Talos machinery is
+// avoided on purpose: it fails on "unknown" fields, which would tie Sidero to the exact Talos
+// version it was built with.
+type kubeletConfigDocument struct {
+	APIVersion string         `yaml:"apiVersion"`
+	Kind       string         `yaml:"kind"`
+	ExtraArgs  map[string]any `yaml:"extraArgs"`
+}
+
+// findKubeletConfigDocument looks for a `KubeletConfig` document in a (potentially multi-doc) machine config.
+//
+// It returns nil if the machine config doesn't contain one.
+func findKubeletConfigDocument(decodedData []byte) (*kubeletConfigDocument, error) {
+	decoder := yaml.NewDecoder(bytes.NewReader(decodedData))
+
+	for {
+		var doc kubeletConfigDocument
+
+		err := decoder.Decode(&doc)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, nil //nolint:nilnil
+			}
+
+			return nil, err
+		}
+
+		if doc.APIVersion == "v1alpha1" && doc.Kind == k8stypes.KubeletConfig { //nolint:goconst
+			return &doc, nil
+		}
+	}
+}
+
+// labelNodesKubeletConfig appends the node label to the `extraArgs` of the `KubeletConfig` document.
+func labelNodesKubeletConfig(decodedData []byte, serverName string, kubeletConfig *kubeletConfigDocument) ([]byte, errorWithCode) {
+	label := fmt.Sprintf("metal.sidero.dev/uuid=%s", serverName)
+
+	// `extraArgs` values are either a single string or a list of strings, so keep whichever
+	// form the existing `node-labels` uses.
+	var nodeLabels any
+
+	switch existing := kubeletConfig.ExtraArgs["node-labels"].(type) {
+	case nil:
+		nodeLabels = label
+	case string:
+		if existing == "" {
+			nodeLabels = label
+		} else {
+			nodeLabels = existing + "," + label
+		}
+	case []any:
+		nodeLabels = slices.Concat(existing, []any{label})
+	default:
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("unexpected type %T of kubelet node-labels extra arg", existing)}
+	}
+
+	patch := map[string]any{
+		"apiVersion": kubeletConfig.APIVersion,
+		"kind":       kubeletConfig.Kind,
+		"extraArgs": map[string]any{
+			"node-labels": nodeLabels,
+		},
+	}
+
+	patchMarshaled, err := yaml.Marshal(patch)
+	if err != nil {
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure marshaling KubeletConfig extraArgs: %s", err)}
+	}
+
+	return patchConfig(decodedData, patchMarshaled)
+}
+
+// labelNodes is responsible for editing the kubelet extra args such that a given
+// server gets registered with a label containing the UUID of the server resource it's actually running on.
+func labelNodesLegacy(decodedData []byte, serverName string) ([]byte, errorWithCode) {
 	// avoid using the `configloader` from Talos machinery here, as it will fail on "unknown" fields
 	// causing a dependency on Talos version that Sidero was built with
 	var cfg struct {
@@ -379,6 +505,58 @@ func labelNodes(decodedData []byte, serverName string) ([]byte, errorWithCode) {
 	}
 }
 
+func labelNodesStrategic(decodedData []byte, serverName string) ([]byte, errorWithCode) {
+	// avoid using the `configloader` from Talos machinery here, as it will fail on "unknown" fields
+	// causing a dependency on Talos version that Sidero was built with
+	var cfg struct {
+		Version string `yaml:"version"`
+		Machine *struct {
+			Kubelet *struct {
+				ExtraArgs map[string]string `yaml:"extraArgs"`
+			} `yaml:"kubelet"`
+		} `yaml:"machine"`
+	}
+
+	if err := yaml.Unmarshal(decodedData, &cfg); err != nil {
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure creating config struct: %s", err)}
+	}
+
+	label := fmt.Sprintf("metal.sidero.dev/uuid=%s", serverName)
+
+	patch := map[string]any{
+		"machine": map[string]any{
+			"kubelet": map[string]any{
+				"extraArgs": map[string]*string{
+					"node-labels": &label,
+				},
+			},
+		},
+	}
+
+	switch cfg.Version {
+	case "v1alpha1":
+		switch {
+		case cfg.Machine == nil:
+		case cfg.Machine.Kubelet == nil:
+		case cfg.Machine.Kubelet.ExtraArgs == nil:
+		default:
+			kubeletExtraArgs := cfg.Machine.Kubelet.ExtraArgs
+			if _, ok := kubeletExtraArgs["node-labels"]; ok {
+				label = kubeletExtraArgs["node-labels"] + "," + label
+			}
+		}
+
+		patchMarshaled, err := yaml.Marshal(patch)
+		if err != nil {
+			return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("failure marshaling kubelet.extraArgs: %s", err)}
+		}
+
+		return patchConfig(decodedData, patchMarshaled)
+	default:
+		return nil, errorWithCode{http.StatusInternalServerError, fmt.Errorf("unknown config type")}
+	}
+}
+
 // findMetalMachineServerBinding is responsible for looking up ServerBinding and MetalMachine.
 func (m *metadataConfigs) findMetalMachineServerBinding(ctx context.Context, serverName string) (infrav1.MetalMachine, infrav1.ServerBinding, errorWithCode) {
 	var serverBinding infrav1.ServerBinding
@@ -405,6 +583,67 @@ func (m *metadataConfigs) findMetalMachineServerBinding(ctx context.Context, ser
 	return metalMachine, serverBinding, errorWithCode{}
 }
 
+func (m *metadataConfigs) patchSideroLinkConfig(decodedData []byte) ([]byte, errorWithCode) {
+	var ewc errorWithCode
+
+	sideroLinkPatch := siderolinktypes.NewConfigV1Alpha1()
+
+	apiURL, err := url.Parse(fmt.Sprintf("grpc://%s", net.JoinHostPort(m.apiEndpoint, strconv.Itoa(m.apiPort))))
+	if err != nil {
+		return decodedData, errorWithCode{
+			errorCode: http.StatusInternalServerError,
+			errorObj:  err,
+		}
+	}
+
+	apiMetaURL := meta.URL{
+		URL: apiURL,
+	}
+	sideroLinkPatch.APIUrlConfig = apiMetaURL
+
+	eventsSinkPatch := runtimetypes.NewEventSinkV1Alpha1()
+	eventsSinkPatch.Endpoint = net.JoinHostPort(siderolink.Cfg.ServerAddress.Addr().String(), strconv.Itoa(siderolink.EventsSinkPort))
+
+	kmsgLogPatch := runtimetypes.NewKmsgLogV1Alpha1()
+	kmsgLogURL, _ := url.Parse(fmt.Sprintf("tcp://%s", net.JoinHostPort(siderolink.Cfg.ServerAddress.Addr().String(), strconv.Itoa(siderolink.LogReceiverPort))))
+	kmsgLogMetaURL := meta.URL{
+		URL: kmsgLogURL,
+	}
+	kmsgLogPatch.KmsgLogURL = kmsgLogMetaURL
+	kmsgLogPatch.MetaName = "remote-log"
+
+	ctr, err := container.New(sideroLinkPatch, eventsSinkPatch, kmsgLogPatch)
+	if err != nil {
+		return decodedData, errorWithCode{
+			errorCode: http.StatusInternalServerError,
+			errorObj:  err,
+		}
+	}
+
+	_, err = ctr.ValidateAsClient(validationMode{})
+	if err != nil {
+		return decodedData, errorWithCode{
+			errorCode: http.StatusInternalServerError,
+			errorObj:  err,
+		}
+	}
+
+	patchData, err := ctr.EncodeBytes(encoder.WithComments(encoder.CommentsDisabled))
+	if err != nil {
+		return decodedData, errorWithCode{
+			errorCode: http.StatusInternalServerError,
+			errorObj:  err,
+		}
+	}
+
+	decodedData, ewc = patchConfig(decodedData, patchData)
+	if ewc.errorObj != nil {
+		return decodedData, ewc
+	}
+
+	return decodedData, errorWithCode{}
+}
+
 // fetchBootstrapSecret is responsible for fetching a secret that contains the bootstrap data created by our bootstrap provider.
 func (m *metadataConfigs) fetchBootstrapSecret(ctx context.Context, secretNSN types.NamespacedName) ([]byte, errorWithCode) {
 	bootstrapSecretData := &v1.Secret{}
@@ -427,4 +666,18 @@ func (m *metadataConfigs) fetchBootstrapSecret(ctx context.Context, secretNSN ty
 	}
 
 	return bootstrapSecretData.Data["value"], errorWithCode{}
+}
+
+type validationMode struct{}
+
+func (validationMode) String() string {
+	return "metadata-server"
+}
+
+func (validationMode) RequiresInstall() bool {
+	return true
+}
+
+func (validationMode) InContainer() bool {
+	return false
 }

@@ -38,6 +38,8 @@ FROM --platform=amd64 ghcr.io/siderolabs/util-linux:${PKGS} AS pkg-util-linux-am
 FROM --platform=arm64 ghcr.io/siderolabs/util-linux:${PKGS} AS pkg-util-linux-arm64
 FROM --platform=amd64 ghcr.io/siderolabs/kmod:${PKGS} AS pkg-kmod-amd64
 FROM --platform=arm64 ghcr.io/siderolabs/kmod:${PKGS} AS pkg-kmod-arm64
+FROM --platform=amd64 ghcr.io/siderolabs/libucontext:${PKGS} AS pkg-libucontext-amd64
+FROM --platform=arm64 ghcr.io/siderolabs/libucontext:${PKGS} AS pkg-libucontext-arm64
 
 # linux-firmware is not arch-specific
 FROM --platform=amd64 ghcr.io/siderolabs/linux-firmware:${PKGS} AS pkg-linux-firmware
@@ -46,23 +48,23 @@ FROM --platform=amd64 ghcr.io/siderolabs/linux-firmware:${PKGS} AS pkg-linux-fir
 # code
 
 FROM --platform=${BUILDPLATFORM} ${TOOLS} AS base
-SHELL ["/toolchain/bin/bash", "-c"]
-ENV PATH /toolchain/bin:/toolchain/go/bin:/go/bin
-RUN ["/toolchain/bin/mkdir", "/bin", "/tmp"]
-RUN ["/toolchain/bin/ln", "-svf", "/toolchain/bin/bash", "/bin/sh"]
-RUN ["/toolchain/bin/ln", "-svf", "/toolchain/etc/ssl", "/etc/ssl"]
-ENV GO111MODULE on
-ENV GOPROXY https://proxy.golang.org
-ARG CGO_ENABLED
-ENV CGO_ENABLED ${CGO_ENABLED}
-ENV GOCACHE /.cache/go-build
-ENV GOMODCACHE /.cache/mod
-ENV GOTOOLCHAIN local
-RUN --mount=type=cache,target=/.cache go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.2
-RUN --mount=type=cache,target=/.cache go install k8s.io/code-generator/cmd/conversion-gen@v0.31.0
-RUN --mount=type=cache,target=/.cache go install mvdan.cc/gofumpt/gofumports@v0.1.1
-RUN --mount=type=cache,target=/.cache go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2 \
-	&& mv /go/bin/golangci-lint /toolchain/bin/golangci-lint
+ENV GOTOOLCHAIN=local
+ENV CGO_ENABLED=0
+ENV GO111MODULE=on
+ENV GOPROXY=https://proxy.golang.org
+ENV GOCACHE=/.cache/go-build
+ENV GOMODCACHE=/.cache/mod
+SHELL ["/bin/bash", "-c"]
+RUN --mount=type=cache,target=/.cache go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.0 \
+    && mv /root/go/bin/controller-gen /usr/bin/controller-gen
+RUN --mount=type=cache,target=/.cache go install k8s.io/code-generator/cmd/conversion-gen@v0.32.3 \
+    && mv /root/go/bin/conversion-gen /usr/bin/conversion-gen
+RUN --mount=type=cache,target=/.cache go install mvdan.cc/gofumpt/gofumports@v0.1.1 \
+    && mv /root/go/bin/gofumports /usr/bin/gofumports
+RUN --mount=type=cache,target=/.cache go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.5.0 \
+    && mv /root/go/bin/golangci-lint /usr/bin/golangci-lint
+RUN --mount=type=cache,target=/.cache go install github.com/bufbuild/buf/cmd/buf@v1.61.0 \
+    && mv /root/go/bin/buf /usr/bin/buf
 WORKDIR /src
 COPY ./go.mod ./
 COPY ./go.sum ./
@@ -75,13 +77,13 @@ RUN --mount=type=cache,target=/.cache go list -mod=readonly all >/dev/null
 
 FROM base AS manifests-build
 RUN --mount=type=cache,target=/.cache controller-gen \
-  crd:crdVersions=v1 paths="./app/caps-controller-manager/api/..." output:crd:dir="./app/caps-controller-manager/config/crd/bases" \
-  rbac:roleName=manager-role paths="./app/caps-controller-manager/controllers/..." output:rbac:dir="./app/caps-controller-manager/config/rbac" \
-  webhook output:webhook:dir="./app/caps-controller-manager/config/webhook"
+    crd:crdVersions=v1 paths="./app/caps-controller-manager/api/..." output:crd:dir="./app/caps-controller-manager/config/crd/bases" \
+    rbac:roleName=manager-role paths="./app/caps-controller-manager/controllers/..." output:rbac:dir="./app/caps-controller-manager/config/rbac" \
+    webhook output:webhook:dir="./app/caps-controller-manager/config/webhook"
 RUN --mount=type=cache,target=/.cache controller-gen \
-  crd:crdVersions=v1 paths="./app/sidero-controller-manager/api/..." output:crd:dir="./app/sidero-controller-manager/config/crd/bases" \
-  rbac:roleName=manager-role paths="./app/sidero-controller-manager/controllers/..." output:rbac:dir="./app/sidero-controller-manager/config/rbac" \
-  webhook output:webhook:dir="./app/sidero-controller-manager/config/webhook"
+    crd:crdVersions=v1 paths="./app/sidero-controller-manager/api/..." output:crd:dir="./app/sidero-controller-manager/config/crd/bases" \
+    rbac:roleName=manager-role paths="./app/sidero-controller-manager/controllers/..." output:rbac:dir="./app/sidero-controller-manager/config/rbac" \
+    webhook output:webhook:dir="./app/sidero-controller-manager/config/webhook"
 
 FROM scratch AS manifests
 COPY --from=manifests-build /src/app/caps-controller-manager/config ./app/caps-controller-manager/config
@@ -89,10 +91,8 @@ COPY --from=manifests-build /src/app/sidero-controller-manager/config ./app/side
 
 FROM base AS generate-build
 COPY ./app/sidero-controller-manager/internal/api/api.proto \
-  /src/app/sidero-controller-manager/internal/api/api.proto
-RUN protoc -I/src/app/sidero-controller-manager/internal/api \
-  --go_out=paths=source_relative:/src/app/sidero-controller-manager/internal/api --go-grpc_out=paths=source_relative:/src/app/sidero-controller-manager/internal/api \
-  api.proto
+    /src/app/sidero-controller-manager/internal/api/api.proto
+RUN buf build
 RUN --mount=type=cache,target=/.cache controller-gen object:headerFile="./hack/boilerplate.go.txt" paths="./..."
 RUN --mount=type=cache,target=/.cache conversion-gen --output-file=zz_generated.conversion.go --go-header-file="./hack/boilerplate.go.txt" ./app/caps-controller-manager/api/v1alpha2
 RUN --mount=type=cache,target=/.cache conversion-gen --output-file=zz_generated.conversion.go --go-header-file="./hack/boilerplate.go.txt" ./app/sidero-controller-manager/api/v1alpha1
@@ -104,7 +104,7 @@ COPY --from=generate-build /src/app/caps-controller-manager/api ./app/caps-contr
 COPY --from=generate-build /src/app/sidero-controller-manager/api ./app/sidero-controller-manager/api
 COPY --from=generate-build /src/app/sidero-controller-manager/internal/api ./app/sidero-controller-manager/internal/api
 
-FROM --platform=${BUILDPLATFORM} alpine:3.17.3 AS release-build
+FROM --platform=${BUILDPLATFORM} alpine:3.21 AS release-build
 ADD https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.1.0/kustomize_v4.1.0_linux_amd64.tar.gz .
 RUN  tar -xf kustomize_v4.1.0_linux_amd64.tar.gz -C /usr/local/bin && rm kustomize_v4.1.0_linux_amd64.tar.gz
 COPY ./config ./config
@@ -114,12 +114,12 @@ COPY ./app/sidero-controller-manager/config ./app/sidero-controller-manager/conf
 ARG REGISTRY_AND_USERNAME
 ARG TAG
 RUN cd ./app/caps-controller-manager/config/manager \
-  && kustomize edit set image controller=${REGISTRY_AND_USERNAME}/caps-controller-manager:${TAG}
+    && kustomize edit set image controller=${REGISTRY_AND_USERNAME}/caps-controller-manager:${TAG}
 RUN cd ./app/sidero-controller-manager/config/manager \
-  && kustomize edit set image controller=${REGISTRY_AND_USERNAME}/sidero-controller-manager:${TAG}
+    && kustomize edit set image controller=${REGISTRY_AND_USERNAME}/sidero-controller-manager:${TAG}
 RUN kustomize build config > /infrastructure-components.yaml \
-  && cp ./config/metadata/metadata.yaml /metadata.yaml \
-  && cp ./templates/cluster-template.yaml /cluster-template.yaml
+    && cp ./config/metadata/metadata.yaml /metadata.yaml \
+    && cp ./templates/cluster-template.yaml /cluster-template.yaml
 
 FROM scratch AS release
 ARG TAG
@@ -191,6 +191,7 @@ RUN chmod +x /agent
 
 FROM base AS initramfs-archive-amd64
 WORKDIR /initramfs
+COPY --from=pkg-fhs / .
 COPY --from=pkg-ca-certificates / .
 COPY --from=pkg-musl-amd64 / .
 COPY --from=pkg-openssl-amd64 / .
@@ -200,19 +201,21 @@ COPY --from=pkg-systemd-udevd-amd64 / .
 COPY --from=pkg-libcap-amd64 / .
 COPY --from=pkg-libsepol-amd64 / .
 COPY --from=pkg-libselinux-amd64 / .
+COPY --from=pkg-libucontext-amd64 / .
 COPY --from=pkg-pcre2-amd64 / .
 COPY --from=pkg-ipmitool-amd64 / .
 COPY --from=agent-build-amd64 /agent ./init
-COPY --from=pkg-linux-firmware /lib/firmware/qed ./lib/firmware/qed
-COPY --from=pkg-linux-firmware /lib/firmware/bnx2 ./lib/firmware/bnx2
-COPY --from=pkg-linux-firmware /lib/firmware/bnx2x ./lib/firmware/bnx2x
-COPY --from=pkg-linux-firmware /lib/firmware/intel/ice/ddp/ice-*.pkg ./lib/firmware/intel/ice/ddp/ice.pkg
-COPY --from=pkg-linux-firmware /lib/firmware/rtl_nic ./lib/firmware/rtl_nic
-COPY --from=pkg-kernel-amd64 /lib/modules ./lib/modules
+COPY --from=pkg-linux-firmware /usr/lib/firmware/qed ./usr/lib/firmware/qed
+COPY --from=pkg-linux-firmware /usr/lib/firmware/bnx2 ./usr/lib/firmware/bnx2
+COPY --from=pkg-linux-firmware /usr/lib/firmware/bnx2x ./usr/lib/firmware/bnx2x
+COPY --from=pkg-linux-firmware /usr/lib/firmware/intel/ice/ddp/ice-*.pkg ./usr/lib/firmware/intel/ice/ddp/ice.pkg
+COPY --from=pkg-linux-firmware /usr/lib/firmware/rtl_nic ./usr/lib/firmware/rtl_nic
+COPY --from=pkg-kernel-amd64 /usr/lib/modules ./usr/lib/modules
 RUN set -o pipefail && find . 2>/dev/null | cpio -H newc -o | xz -v -C crc32 -0 -e -T 0 -z >/initramfs.xz
 
 FROM base AS initramfs-archive-arm64
 WORKDIR /initramfs
+COPY --from=pkg-fhs / .
 COPY --from=pkg-ca-certificates / .
 COPY --from=pkg-musl-arm64 / .
 COPY --from=pkg-openssl-arm64 / .
@@ -222,15 +225,16 @@ COPY --from=pkg-systemd-udevd-arm64 / .
 COPY --from=pkg-libcap-arm64 / .
 COPY --from=pkg-libsepol-arm64 / .
 COPY --from=pkg-libselinux-arm64 / .
+COPY --from=pkg-libucontext-arm64 / .
 COPY --from=pkg-pcre2-arm64 / .
 COPY --from=pkg-ipmitool-arm64 / .
 COPY --from=agent-build-arm64 /agent ./init
-COPY --from=pkg-linux-firmware /lib/firmware/qed ./lib/firmware/qed
-COPY --from=pkg-linux-firmware /lib/firmware/bnx2 ./lib/firmware/bnx2
-COPY --from=pkg-linux-firmware /lib/firmware/bnx2x ./lib/firmware/bnx2x
-COPY --from=pkg-linux-firmware /lib/firmware/intel/ice/ddp/ice-*.pkg ./lib/firmware/intel/ice/ddp/ice.pkg
-COPY --from=pkg-linux-firmware /lib/firmware/rtl_nic ./lib/firmware/rtl_nic
-COPY --from=pkg-kernel-arm64 /lib/modules ./lib/modules
+COPY --from=pkg-linux-firmware /usr/lib/firmware/qed ./usr/lib/firmware/qed
+COPY --from=pkg-linux-firmware /usr/lib/firmware/bnx2 ./usr/lib/firmware/bnx2
+COPY --from=pkg-linux-firmware /usr/lib/firmware/bnx2x ./usr/lib/firmware/bnx2x
+COPY --from=pkg-linux-firmware /usr/lib/firmware/intel/ice/ddp/ice-*.pkg ./usr/lib/firmware/intel/ice/ddp/ice.pkg
+COPY --from=pkg-linux-firmware /usr/lib/firmware/rtl_nic ./usr/lib/firmware/rtl_nic
+COPY --from=pkg-kernel-arm64 /usr/lib/modules ./usr/lib/modules
 RUN set -o pipefail && find . 2>/dev/null | cpio -H newc -o | xz -v -C crc32 -0 -e -T 0 -z >/initramfs.xz
 
 FROM scratch AS sidero-controller-manager-image
@@ -293,7 +297,7 @@ COPY --from=fmt-build /src /
 #
 # The markdownlint target performs linting on Markdown files.
 #
-FROM node:19.9.0-alpine AS lint-markdown
+FROM node:22.14.0-alpine AS lint-markdown
 RUN apk add --no-cache findutils
 RUN npm i -g markdownlint-cli@0.23.2
 RUN npm i -g textlint@11.7.6
